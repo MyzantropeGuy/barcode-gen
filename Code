@@ -6,6 +6,26 @@
     <title>Расширенный Генератор Штрихкодов</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/bwip-js@2.0.11/dist/bwip-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <style>
+        .form-control.w-30, .form-select.w-30, .btn.w-30 {
+            width: 30%!important;
+        }
+        .btn-custom {
+            width: auto;
+            padding: 5px 10px;
+        }
+        .barcode-canvas {
+            width: 150%; /* Увеличиваем ширину на 50% */
+            height: auto;
+        }
+        .col-md-2 {
+            margin-right: 50px; /* Добавляем расстояние между штрих-кодами по ширине */
+        }
+        .text-input {
+            width: 150%; /* Увеличиваем ширину поля ввода над штрих-кодом */
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
@@ -15,11 +35,11 @@
                 <form id="barcode-form" class="mt-4">
                     <div class="mb-3">
                         <label for="barcode-text" class="form-label">Текст для штрихкода</label>
-                        <textarea id="barcode-text" class="form-control w-50" rows="3" placeholder="Введите один или несколько текстов, каждый с новой строки" required></textarea>
+                        <textarea id="barcode-text" class="form-control w-30" rows="3" placeholder="Введите один или несколько текстов, каждый с новой строки" required></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="barcode-type" class="form-label">Тип штрихкода</label>
-                        <select id="barcode-type" class="form-select w-50">
+                        <select id="barcode-type" class="form-select w-30">
                             <option value="code128">Code 128</option>
                             <option value="ean13">EAN-13</option>
                             <option value="upc">UPC</option>
@@ -29,19 +49,19 @@
                     </div>
                     <div class="mb-3">
                         <label for="barcode-width" class="form-label">Ширина (пиксели)</label>
-                        <input type="number" id="barcode-width" class="form-control w-50" value="200" required>
+                        <input type="number" id="barcode-width" class="form-control w-30" value="200" required>
                     </div>
                     <div class="mb-3">
                         <label for="barcode-height" class="form-label">Высота (пиксели)</label>
-                        <input type="number" id="barcode-height" class="form-control w-50" value="50" required>
+                        <input type="number" id="barcode-height" class="form-control w-30" value="50" required>
                     </div>
                     <div class="mb-3">
                         <label for="barcode-scale" class="form-label">Масштаб</label>
-                        <input type="number" id="barcode-scale" class="form-control w-50" value="1" required>
+                        <input type="number" id="barcode-scale" class="form-control w-30" value="1" required>
                     </div>
                     <div class="mb-3">
                         <label for="font-select" class="form-label">Шрифт текста</label>
-                        <select id="font-select" class="form-select w-50">
+                        <select id="font-select" class="form-select w-30">
                             <option value="Arial">Arial</option>
                             <option value="Courier New">Courier New</option>
                             <option value="Times New Roman">Times New Roman</option>
@@ -50,29 +70,28 @@
                     </div>
                     <div class="mb-3">
                         <label for="font-size" class="form-label">Размер шрифта</label>
-                        <input type="number" id="font-size" class="form-control w-50" value="18">
+                        <input type="number" id="font-size" class="form-control w-30" value="18">
                     </div>
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="bold-text" checked>
                         <label class="form-check-label" for="bold-text">Жирный текст</label>
                     </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="show-text">
-                        <label class="form-check-label" for="show-text">Отображать текст под штрихкодом</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-50">Сгенерировать</button>
+                    <button type="button" id="generate-button" class="btn btn-primary btn-custom">Сгенерировать</button>
+                    <button type="button" id="download-button" class="btn btn-secondary btn-custom mt-2">Скачать PDF</button>
                 </form>
             </div>
-            <div class="col-md-6 text-center">
-                <div id="barcode-results" class="mt-4 d-flex flex-column align-items-center"></div>
+            <div class="col-md-6">
+                <div id="barcode-results" class="row mt-4"></div>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('barcode-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-
+        const generateButton = document.getElementById('generate-button');
+        const downloadButton = document.getElementById('download-button');
+        const resultsDiv = document.getElementById('barcode-results');
+        
+        generateButton.addEventListener('click', function() {
             const texts = document.getElementById('barcode-text').value.split('\n');
             const type = document.getElementById('barcode-type').value;
             const width = parseInt(document.getElementById('barcode-width').value, 10) || 200;
@@ -81,19 +100,20 @@
             const font = document.getElementById('font-select').value;
             const fontSize = parseInt(document.getElementById('font-size').value, 10) || 18;
             const isBold = document.getElementById('bold-text').checked;
-            const showText = document.getElementById('show-text').checked;
 
-            const resultsDiv = document.getElementById('barcode-results');
             resultsDiv.innerHTML = ''; // Очистить предыдущие результаты
 
             texts.forEach((text, index) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'mb-4 text-center';
+                const colDiv = document.createElement('div');
+                colDiv.className = 'col-md-2 mb-4';  // Используем колонки для размещения в несколько столбцов
 
+                const wrapper = document.createElement('div');
+                wrapper.className = 'text-center';
+                
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.placeholder = 'Введите текст';
-                input.className = 'form-control mb-2 w-75 mx-auto';
+                input.className = 'form-control mb-2 w-300 text-input';
                 input.value = text.trim(); // Автозаполнение текста
                 wrapper.appendChild(input);
 
@@ -101,15 +121,16 @@
                 canvas.id = `barcode-canvas-${index}`;
                 canvas.width = width;
                 canvas.height = height;
-                canvas.className = 'mb-2';
+                canvas.className = 'barcode-canvas';
                 wrapper.appendChild(canvas);
 
-                resultsDiv.appendChild(wrapper);
+                colDiv.appendChild(wrapper);
+                resultsDiv.appendChild(colDiv);
 
                 bwipjs.toCanvas(canvas, {
                     bcid: type, // Тип штрихкода
                     text: text.trim(), // Текст для кодирования
-                    includetext: showText, // Отображение текста под штрихкодом
+                    includetext: true, // Отображение текста под штрихкодом
                     scale: scale, // Масштаб
                     height: height // Высота штрихкода
                 }, function (err) {
@@ -141,6 +162,47 @@
                 // Триггерим событие input, чтобы текст сразу отобразился
                 input.dispatchEvent(new Event('input'));
             });
+        });
+
+        downloadButton.addEventListener('click', function() {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            const canvases = resultsDiv.getElementsByTagName('canvas');
+
+            const margin = 10;
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const cols = 4;
+            const rows = 4;
+            const barcodeWidth = (pageWidth - (cols + 1) * margin) / cols;
+            let barcodesOnPage = 0;
+
+            let x = margin;
+            let y = margin;
+
+            Array.from(canvases).forEach((canvas, index) => {
+                if (barcodesOnPage >= cols * rows) {
+                    pdf.addPage();
+                    x = margin;
+                    y = margin;
+                    barcodesOnPage = 0;
+                }
+
+                const imgData = canvas.toDataURL('image/png');
+                const aspectRatio = canvas.width / canvas.height;
+                const imgHeight = barcodeWidth / aspectRatio;
+
+                if (barcodesOnPage % cols === 0 && barcodesOnPage !== 0) {
+                    y += imgHeight + margin;
+                    x = margin;
+                }
+
+                pdf.addImage(imgData, 'PNG', x, y, barcodeWidth, imgHeight);
+                x += barcodeWidth + margin;
+                barcodesOnPage++;
+            });
+
+            pdf.save('barcodes.pdf');
         });
     </script>
 </body>
